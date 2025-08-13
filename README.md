@@ -79,7 +79,7 @@ python -m app.tracker
 ```
 ### Simple detector demo
 ```powershell
-python -m app.simple_detector
+python -m app.tracker
 ```
 Press `q` to quit the window.
 
