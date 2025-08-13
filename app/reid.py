@@ -44,9 +44,6 @@ class ReID:
             preprocessed_image = preprocessed_image.unsqueeze(0).to(self.device)
             
             embedding = self.reidmodel(preprocessed_image).detach().cpu().numpy()[0]
-            
-            # norm = np.linalg.norm(embedding) + 1e-12
-            # embedding = (embedding / norm).astype(np.float32)
 
         return embedding
 
@@ -60,8 +57,6 @@ class ReID:
 
         ids_rows = results.get("ids", [[]])
         dist_rows = results.get("distances", [[]])
-        # print(f"Search results: {ids_rows}")
-        # print(f"Search results: {dist_rows}")
 
         if not ids_rows or not dist_rows:
             return None
