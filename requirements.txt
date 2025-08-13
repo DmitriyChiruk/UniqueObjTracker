@@ -1,0 +1,8 @@
+chromadb
+gdown
+python-dotenv
+tensorboard
+torch
+torchreid
+ultralytics
+yt-dlp
