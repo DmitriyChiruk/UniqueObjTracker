@@ -7,7 +7,8 @@ STREAM_URL = os.getenv("STREAM_URL", 0)
 MODEL_PATH = os.getenv("MODEL_PATH", "yolov8n.pt")
 TRACKER = os.getenv("TRACKER", "bytetrack.yaml")
 
-CLASSES_THRESHOLD = int(os.getenv("CLASSES_THRESHOLD"))
+classes_threshold = int(os.getenv("CLASSES_THRESHOLD", 0))
+SKIP_CLASSES = set(range(classes_threshold, 80))
 
 CHROMADB_PATH = os.getenv("CHROMADB_PATH", "objects_ids")
 REID_MODEL = os.getenv("REID_MODEL", "osnet_x1_0")

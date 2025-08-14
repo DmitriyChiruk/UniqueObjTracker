@@ -36,9 +36,9 @@ def connect_to_video(stream_url):
         print("Direct stream URL:", direct_url)
         return cv2.VideoCapture(direct_url)
     
-    return cv2.VideoCapture(0)
+    return cv2.VideoCapture(stream_url)
     
-def process_boxes(frame, result, labels, re_id, classes_threshold=-1, color=(0, 255, 0)):
+def process_boxes(frame, result, labels, re_id, skip_classes=set(), color=(0, 255, 0)):
     """
     Process the detected boxes and draw them on the frame.
 
@@ -57,7 +57,7 @@ def process_boxes(frame, result, labels, re_id, classes_threshold=-1, color=(0, 
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
     
     for (tlx, tly, brx, bry), cls, conf, id in zip(boxes, clases, confs, ids):
-        if classes_threshold > 0 and cls > classes_threshold:
+        if skip_classes and cls in skip_classes:
             continue
         
         tlx, tly, brx, bry = map(int, (tlx, tly, brx, bry))
@@ -74,6 +74,27 @@ def process_boxes(frame, result, labels, re_id, classes_threshold=-1, color=(0, 
         
         cv2.rectangle(frame, (tlx, tly), (brx, bry), color, 2)
         cv2.putText(frame, text, (tlx, max(20, tly-5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+def process_video(cap, model, re_id, tracker, skip_classes, resize_shape=(1280, 720)):
+    """Process cv2 video frames for object detection and tracking."""
+    
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
+            print("Failed to read frame from video stream.")
+            break
+
+        result = model.track(frame, tracker)[0]
+
+        process_boxes(frame, result, model.names, re_id, skip_classes)
+
+        frame = cv2.resize(frame, resize_shape)
+        cv2.imshow("Unique Object Tracking app", frame)
+        if cv2.waitKey(1) == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 def print_vdb_info(re_id):
     """

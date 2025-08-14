@@ -1,8 +1,10 @@
 chromadb
+fastapi[standard]
 gdown
 python-dotenv
 tensorboard
 torch
 torchreid
 ultralytics
+uvicorn[standard]
 yt-dlp
