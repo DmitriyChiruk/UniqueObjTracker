@@ -68,91 +68,84 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     
     height, width = frame.shape[:2]
     boxes = result.boxes.xyxyn.detach().cpu().numpy()
-    clases = result.boxes.cls.detach().cpu().numpy()
+    classes = result.boxes.cls.detach().cpu().numpy()
     confs = result.boxes.conf.detach().cpu().numpy()
-        
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
+    
+    mask = [cls not in skip_classes for cls in classes]
+    boxes, classes, confs, ids = boxes[mask], classes[mask], confs[mask], ids[mask]
+    
+    boxes_px = (boxes * [width, height, width, height]).astype(int)
+    crops = [frame[y1:y2, x1:x2] for (x1, y1, x2, y2) in boxes_px]
+
     detections = []
     ids_pool = {}
     
-    for (tlxn, tlyn, brxn, bryn), cls, conf, id in zip(boxes, clases, confs, ids):
-        if skip_classes and cls in skip_classes:
-            continue
-
-        tlx, tly, brx, bry = map(int, (tlxn * width, tlyn * height, brxn * width, bryn * height))
-
-        id = int(id) if id is not None else None
+    if re_id and crops:
+        embeds = re_id.get_embeddings_batch(crops)
+    else:
+        embeds = [None] * len(crops)
+    
+    print(f"Created {len(embeds)} embeddings for {len(crops)} crops.")
+    
+    for (tlxn, tlyn, brxn, bryn), cls, conf, id, cur_embed in zip(boxes, classes, confs, ids, embeds):
         label = labels[int(cls)]
         
-        if re_id:
-            crop = frame[tly:bry, tlx:brx]
-            # rid, vdb_embed = re_id.add(crop, metadata={"label": label})
+        if cur_embed is None:
+            continue
+        
+        rid = re_id.search(cur_embed)
+        
+        if rid is None:
+            rid = re_id.append(cur_embed, metadata={"label": label})
+            ids_pool[rid] = {
+                "embedding": cur_embed,
+                "label": label,
+                "cls": int(cls),
+                "conf": float(conf),
+                "bbox": [tlxn, tlyn, brxn, bryn],
+            }
+            continue
             
-            cur_embed = re_id.get_embedding(crop)
-            rid = re_id.search(cur_embed)
-            if not rid:
-                rid = re_id.append(cur_embed, metadata={"label": label})
-                ids_pool[rid] = {
-                    "embedding": cur_embed,
-                    "label": label,
-                    "cls": int(cls),
-                    "conf": float(conf),
-                    "bbox": [tlxn, tlyn, brxn, bryn],
-                }
-            else:
-                vdb_embed = re_id.search_embedding(rid)
-                
-                # if id in DB but not in pool
-                if rid not in ids_pool:
-                    ids_pool[rid] = {
-                        "embedding": cur_embed,
-                        "label": label,
-                        "cls": int(cls),
-                        "conf": float(conf),
-                        "bbox": [tlxn, tlyn, brxn, bryn],
-                    }
-                # if id in db and pool => compare which is closer, the other should be added as a new instance to vdb
-                else:
-                    saved_embed = ids_pool[rid]["embedding"]
+        vdb_embed = re_id.search_embedding(rid)
+        
+        if rid not in ids_pool:
+            ids_pool[rid] = {
+                "embedding": cur_embed,
+                "label": label,
+                "cls": int(cls),
+                "conf": float(conf),
+                "bbox": [tlxn, tlyn, brxn, bryn],
+            }
+            continue
+        
+        saved_embed = ids_pool[rid]["embedding"]
+        
+        dist_cur = re_id.calc_distance(cur_embed, vdb_embed)
+        dist_saved = re_id.calc_distance(saved_embed, vdb_embed)
+        
+        if dist_cur < dist_saved:
+            ids_pool[rid]["embedding"] = cur_embed
+            new_rid = re_id.append(saved_embed, metadata={"label": label})
+            new_embed = saved_embed
+        else:
+            ids_pool[rid]["embedding"] = saved_embed
+            new_rid = re_id.append(cur_embed, metadata={"label": label})
+            rid = new_rid
+            new_embed = cur_embed
 
-                    dist_cur = re_id.calc_distance(cur_embed, vdb_embed)
-                    dist_saved = re_id.calc_distance(saved_embed, vdb_embed)
-                    
-                    if dist_cur < dist_saved:
-                        ids_pool[rid]["embedding"] = cur_embed
-                        new_rid = re_id.append(saved_embed, metadata={"label": label})
-                        new_embed = saved_embed
-                    else:
-                        ids_pool[rid]["embedding"] = saved_embed
-                        new_rid = re_id.append(cur_embed, metadata={"label": label})
-                        rid = new_rid
-                        new_embed = cur_embed
+        ids_pool[new_rid] = {
+            "embedding": new_embed,
+            "label": label,
+            "cls": int(cls),
+            "conf": float(conf),
+            "bbox": [tlxn, tlyn, brxn, bryn],
+        }
 
-                    ids_pool[new_rid] = {
-                        "embedding": new_embed,
-                        "label": label,
-                        "cls": int(cls),
-                        "conf": float(conf),
-                        "bbox": [tlxn, tlyn, brxn, bryn],
-                    }
-
-        # detections.append({
-        #     "id": rid if re_id else id,
-        #     "label": label,
-        #     "cls": int(cls),
-        #     "conf": float(conf),
-        #     "bbox": [tlxn, tlyn, brxn, bryn],
-        # })
-
-    for id, data in ids_pool.items():
-        detections.append({
-            "id": id,
-            "label": data["label"],
-            "cls": data["cls"],
-            "conf": data["conf"],
-            "bbox": data["bbox"],
-        })
-
+    detections = [
+        {"id": rid, "label": d["label"], "cls": d["cls"], "conf": d["conf"], "bbox": d["bbox"]}
+        for rid, d in ids_pool.items()
+    ]
     return {"frame_index": frame_idx, "detections": detections}
 
 

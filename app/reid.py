@@ -47,6 +47,15 @@ class ReID:
             embedding = self.reidmodel(preprocessed_image).detach().cpu().numpy()[0]
 
         return embedding
+    
+    def get_embeddings_batch(self, batch):
+        assert isinstance(batch, list), "Batch must be a list of numpy.ndarray"
+
+        preprocessed_batch = [self.preprocess(img).unsqueeze(0) for img in batch]
+        batch_tensor = torch.cat(preprocessed_batch, dim=0).to(self.device)
+
+        with torch.no_grad():
+            return self.reidmodel(batch_tensor).detach().cpu().numpy()
 
     def calc_distance(self, embedding1, embedding2):
         if self.metric == "cosine":
