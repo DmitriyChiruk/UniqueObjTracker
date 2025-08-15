@@ -8,7 +8,7 @@ MODEL_PATH = os.getenv("MODEL_PATH", "yolov8n.pt")
 TRACKER = os.getenv("TRACKER", "bytetrack.yaml")
 
 classes_threshold = int(os.getenv("CLASSES_THRESHOLD", 0))
-SKIP_CLASSES = set(range(classes_threshold, 80))
+SKIP_CLASSES = set(range(classes_threshold + 1, 80))
 
 CHROMADB_PATH = os.getenv("CHROMADB_PATH", "objects_ids")
 REID_MODEL = os.getenv("REID_MODEL", "osnet_x1_0")

@@ -25,6 +25,7 @@ def read_root():
 
 @app.post("/process")
 async def process(
+    # input: Union[str, UploadFile, None] = Form(None)
     video_file: Optional[UploadFile] = File(None),
     stream_url: Optional[str] = Form(None),
     max_frames: int = Form(1000),
