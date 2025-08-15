@@ -9,9 +9,9 @@ from torchvision import transforms
 from .config import CHROMADB_PATH, REID_MODEL, REID_INPUT_SHAPE, REID_SIM_THRESHOLD, REID_DISTANCE
 
 class ReID:
-    def __init__(self, db_path=CHROMADB_PATH): 
+    def __init__(self, db_path=CHROMADB_PATH, model_name=REID_MODEL, input_shape=REID_INPUT_SHAPE, distance=REID_DISTANCE): 
         self.reidmodel = torchreid.models.build_model(
-            name=REID_MODEL,
+            name=model_name,
             num_classes=1000,
             pretrained=True,
         )
@@ -21,7 +21,7 @@ class ReID:
         
         self.preprocess = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(REID_INPUT_SHAPE),
+            transforms.Resize(input_shape),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
         
@@ -29,8 +29,8 @@ class ReID:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         self.client = chromadb.PersistentClient(path=self.db_path)
-        
-        space = REID_DISTANCE
+
+        space = distance
         self.collection = self.client.get_or_create_collection(
             name="objects",
             metadata={"hnsw:space": space}

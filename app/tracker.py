@@ -21,7 +21,7 @@ def main():
 
         result = model.track(frame, tracker=config.TRACKER)[0]
 
-        process_boxes(frame, result, model.names, re_id, config.CLASSES_THRESHOLD)
+        process_boxes(frame, result, model.names, re_id, config.SKIP_CLASSES)
 
         frame = cv2.resize(frame, (1280, 720))
         cv2.imshow("Unique Object Tracking app", frame)
