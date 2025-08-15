@@ -15,10 +15,6 @@ REID = ReID()
 MODEL = load_model(config.MODEL_PATH)
 SESSIONS = {}
 
-# class ProcessParams(BaseModel):
-#     source: Optional[str] = None
-#     max_frames: int = 200
-
 @app.get("/")
 def read_root():
     return {"appname": "Unique Object Tracking App"}

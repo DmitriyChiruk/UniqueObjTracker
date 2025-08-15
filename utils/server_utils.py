@@ -16,13 +16,13 @@ def process_boxes(frame, frame_idx, result, names, re_id, skip_classes=set()):
         return {"frame_index": frame_idx, "detections": []}
     
     boxes = result.boxes.xyxy.detach().cpu().numpy()
-    clases = result.boxes.cls.detach().cpu().numpy()
+    classes = result.boxes.cls.detach().cpu().numpy()
     confs = result.boxes.conf.detach().cpu().numpy()
         
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
     
     detections = []
-    for (tlx, tly, brx, bry), cls, conf in zip(boxes, clases, confs):
+    for (tlx, tly, brx, bry), cls, conf in zip(boxes, classes, confs):
         if skip_classes and cls in skip_classes:
             continue
         
