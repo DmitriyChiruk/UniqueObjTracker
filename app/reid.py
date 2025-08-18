@@ -71,7 +71,6 @@ class ReID:
             Returns the embedding if found, else None.
         """
 
-        # results = self.collection.get(ids=[id])
         results = self.collection.get(ids=[str(id)], include=["embeddings"])
         embeddings = results.get("embeddings", [None])
         return embeddings[0]

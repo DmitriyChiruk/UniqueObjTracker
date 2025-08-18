@@ -2,6 +2,7 @@ import os
 import cv2
 import yt_dlp
 
+import numpy as np
 from ultralytics import YOLO, RTDETR
 
 def load_model(model_path):
@@ -72,10 +73,11 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     confs = result.boxes.conf.detach().cpu().numpy()
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
     
-    mask = [cls not in skip_classes for cls in classes]
+    mask = ~np.isin(classes, list(skip_classes))
     boxes, classes, confs, ids = boxes[mask], classes[mask], confs[mask], ids[mask]
     
-    boxes_px = (boxes * [width, height, width, height]).astype(int)
+    BOX_SCALE = np.array([width, height, width, height])
+    boxes_px = (boxes * BOX_SCALE).astype(int)
     crops = [frame[y1:y2, x1:x2] for (x1, y1, x2, y2) in boxes_px]
 
     detections = []
@@ -85,8 +87,6 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
         embeds = re_id.get_embeddings_batch(crops)
     else:
         embeds = [None] * len(crops)
-    
-    print(f"Created {len(embeds)} embeddings for {len(crops)} crops.")
     
     for (tlxn, tlyn, brxn, bryn), cls, conf, id, cur_embed in zip(boxes, classes, confs, ids, embeds):
         label = labels[int(cls)]
@@ -142,9 +142,13 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
             "bbox": [tlxn, tlyn, brxn, bryn],
         }
 
-    detections = [
-        {"id": rid, "label": d["label"], "cls": d["cls"], "conf": d["conf"], "bbox": d["bbox"]}
-        for rid, d in ids_pool.items()
+    detections = [{
+        "id": rid, 
+        "label": d["label"], 
+        "cls": int(d["cls"]), 
+        "conf": float(d["conf"]), 
+        "bbox": list(map(float, d["bbox"]))
+        } for rid, d in ids_pool.items()
     ]
     return {"frame_index": frame_idx, "detections": detections}
 

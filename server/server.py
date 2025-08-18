@@ -1,8 +1,8 @@
+import os
 import uuid
 import cv2
 from fastapi import FastAPI, UploadFile, File, Form
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Union
 
 import app.config as config
 from app.reid import ReID
@@ -21,9 +21,8 @@ def read_root():
 
 @app.post("/process")
 async def process(
-    # input: Union[str, UploadFile, None] = Form(None)
-    video_file: Optional[UploadFile] = File(None),
-    stream_url: Optional[str] = Form(None),
+    stream_url: Union[str, None] = Form(None),
+    video_file: Union[UploadFile, None] = File(None),
     max_frames: int = Form(1000),
     ):
 
@@ -36,9 +35,6 @@ async def process(
 
         source = video_file.filename
         cap = cv2.VideoCapture(video_path)
-
-        
-        
     elif stream_url:
         source = stream_url
         cap = connect_to_video(stream_url)
@@ -46,6 +42,9 @@ async def process(
     processed_frames = process_video(cap, MODEL, REID, tracker=config.TRACKER, skip_classes=config.SKIP_CLASSES, max_frames=max_frames)
     cap.release()
     
+    if video_path:
+        os.remove(video_path)
+
     result = {
         "session_id": session_id,
         "processed_frames": processed_frames,
