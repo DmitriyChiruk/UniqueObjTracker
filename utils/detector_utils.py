@@ -94,6 +94,15 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
         label = labels[int(cls)]
         
         if cur_embed is None:
+            # ReID not available, still process detection
+            detections.append({
+                "label": label,
+                "cls": int(cls),
+                "conf": float(conf),
+                "bbox": [tlxn, tlyn, brxn, bryn],
+                "id": id,
+                "embedding": None,
+            })
             continue
         
         rid = re_id.search(cur_embed)
