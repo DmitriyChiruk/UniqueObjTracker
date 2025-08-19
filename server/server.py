@@ -180,7 +180,8 @@ def continue_processing(session_id: str = Form(...)):
         return {"error": "Session is not in a valid state for continuation"}
 
 @app.post("/cancel")
-def cancel_processing(session_id):
+@app.post("/cancel/{session_id}")
+def cancel_processing(session_id: str):
     if session_id not in SESSIONS:
         return {"error": "Session not found"}
     
