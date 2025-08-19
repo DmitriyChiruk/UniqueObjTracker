@@ -46,7 +46,9 @@ def draw_boxes(frame, detections, color=(0, 255, 0), thickness=2):
         
         tlx, tly, brx, bry = detection["bbox"]
         tlx, tly, brx, bry = map(int, (tlx * width, tly * height, brx * width, bry * height))
-        text = f"id: {detection['id'][:8]} {detection['label']} {detection['conf']:.2f}"
+        id_val = detection['id']
+        id_str = id_val[:8] if isinstance(id_val, str) else (str(id_val)[:8] if id_val is not None else "N/A")
+        text = f"id: {id_str} {detection['label']} {detection['conf']:.2f}"
 
         cv2.rectangle(frame, (tlx, tly), (brx, bry), color, thickness)
         cv2.putText(frame, text, (tlx, max(20, tly-5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
