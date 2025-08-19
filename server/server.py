@@ -35,7 +35,13 @@ def session2response(session_id):
         "source": session["source"],
         "num_frames": len(session["frames"]),
         "processed_frames": session["frames"]
-    })
+    response = {
+        "session_id": session_id,
+        "status": session["status"].value,
+        "source": session["source"],
+        "num_frames": len(session["frames"]),
+        "processed_frames": session["frames"]
+    }
     
     if not os.path.exists("tmp/sessions"):
         os.makedirs("tmp/sessions")
