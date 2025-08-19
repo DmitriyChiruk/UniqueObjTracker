@@ -1,10 +1,15 @@
 import os
 import uuid
 import cv2
+import json
+
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from typing import Union
 
 import app.config as config
+
+from app.config import SessionStatus
 from app.reid import ReID
 from utils.detector_utils import load_model, connect_to_video
 from utils.server_utils import process_video
@@ -15,6 +20,91 @@ REID = ReID()
 MODEL = load_model(config.MODEL_PATH)
 SESSIONS = {}
 
+def session2response(session_id):
+    if session_id not in SESSIONS:
+        session = config.DEFAULT_SESSION.copy()
+    
+    session = SESSIONS[session_id]
+    
+    response = json.dumps({
+        "session_id": session_id,
+        "status": session["status"].value,
+        "source": session["source"],
+        "num_frames": len(session["frames"]),
+        "processed_frames": session["frames"]
+    })
+    
+    if not os.path.exists("tmp/sessions"):
+        os.makedirs("tmp/sessions")
+    
+    with open(f"tmp/sessions/{session_id}_response.json", "w") as f:
+        json.dump(response, f)
+    
+    # ses_copy = SESSIONS.copy()
+    # for key, ses in ses_copy.items():
+    #     ses_copy[key]["status"] = ""
+    #     ses_copy[key]["cap"] = ""
+
+    # with open("tmp/SESSIONS.json", "w") as f:
+    #     json.dump(ses_copy, f, indent=4)
+        
+    return JSONResponse(response, media_type="application/json")
+
+def process_chunk(session_id):
+    if session_id not in SESSIONS:
+        return
+    
+    if SESSIONS[session_id]["status"] != SessionStatus.PROCESSING:
+        return
+
+    session = SESSIONS[session_id]
+
+    # if not len(session["frames"]) == 0:
+    #     print("Session frames are non empty")
+    #     print("Session ID:", session_id)
+    #     print("Pointer to session ID:", id(session))
+    #     print("Frames:", id(session["frames"]))
+    #     print("Source:", session["source"])
+    #     return session2response(session_id)
+
+    cap = session["cap"]
+
+    max_frames = session["max_frames"]
+    
+    if session["max_frames"] > 0:
+        max_frames = min(session["chunk_sz"], session["max_frames"] - session["next_frame"])
+        max_frames = min(max_frames, cap.get(cv2.CAP_PROP_FRAME_COUNT) - session["next_frame"])
+
+    frames, last_frame_idx = process_video(
+        cap, 
+        MODEL,
+        REID,
+        config.TRACKER,
+        config.SKIP_CLASSES,
+        session["next_frame"],
+        max_frames,
+        session["resize_shape"]
+        )
+    
+    session["frames"].extend(frames)
+
+    print(f"LAST FRAME IDX: {last_frame_idx}")
+    print(f"MAX FRAMES: {max_frames}")
+    print(f"CHUNK SIZE: {session['chunk_sz']}")
+    print(f"Real max frames: {session['max_frames']}")
+    
+    if (last_frame_idx >= session['max_frames']-1 and session['max_frames'] > 0) or not cap.isOpened():
+        session["status"] = SessionStatus.DONE
+        cap.release()
+
+        if os.path.exists(session["source"]) and session["source"].startswith("tmp/"):
+            os.remove(session["source"])
+    else:
+        session["status"] = SessionStatus.PENDING
+        session["next_frame"] = last_frame_idx + 1
+        
+    return session2response(session_id)
+
 @app.get("/")
 def read_root():
     return {"appname": "Unique Object Tracking App"}
@@ -24,46 +114,86 @@ async def process(
     stream_url: Union[str, None] = Form(None),
     video_file: Union[UploadFile, None] = File(None),
     max_frames: int = Form(1000),
+    chunk_sz: int = Form(200)
     ):
 
     session_id = str(uuid.uuid4())
     if video_file:
-        video_path = f"tmp/{session_id}_{video_file.filename}"
+        video_path = f"tmp/video/{session_id}_{video_file.filename}"
+        
+        if not os.path.exists("tmp/video"):
+            os.makedirs("tmp/video")
         
         with open(video_path, "wb") as f:
             f.write(await video_file.read())
 
-        source = video_file.filename
-        cap = cv2.VideoCapture(video_path)
+        source = video_path
+        cap = cv2.VideoCapture(source)
     elif stream_url:
         source = stream_url
-        cap = connect_to_video(stream_url)
-
-    processed_frames = process_video(cap, MODEL, REID, tracker=config.TRACKER, skip_classes=config.SKIP_CLASSES, max_frames=max_frames)
-    cap.release()
+        cap = connect_to_video(source)
     
-    if video_path:
-        os.remove(video_path)
+    session = config.DEFAULT_SESSION.copy()
+    session["status"] = SessionStatus.PROCESSING
+    session["frames"] = []
+    session["source"] = source
+    session["cap"] = cap
+    session["next_frame"] = 0
+    session["chunk_sz"] = chunk_sz
+    session["max_frames"] = max_frames
+    
+    SESSIONS[session_id] = session
+    
+    return process_chunk(session_id)
 
-    result = {
-        "session_id": session_id,
-        "processed_frames": processed_frames,
-        "source": source,
-        }
+@app.post("/continue")
+def continue_processing(session_id):
+    if session_id not in SESSIONS:
+        return {"error": "Session not found"}
+    
+    if SESSIONS[session_id]["status"] == SessionStatus.DONE:
+        return {"error": "Session is already done"}
+    
+    elif SESSIONS[session_id]["status"] == SessionStatus.FAILED:
+        return {"error": "Session has failed"}
+    
+    elif SESSIONS[session_id]["status"] == SessionStatus.PROCESSING:
+        return {"error": "Session is already processing"}
+    
+    elif SESSIONS[session_id]["status"] == SessionStatus.CANCELLED:
+        return {"error": "Session was cancelled"}
+    
+    elif SESSIONS[session_id]["status"] == SessionStatus.PENDING:
+        SESSIONS[session_id]["status"] = SessionStatus.PROCESSING
+        return process_chunk(session_id)
 
-    SESSIONS[session_id] = {
-        "status": "done", 
-        "frames": processed_frames, 
-        "source": source,
-        }
-    return result
+    else:
+        return {"error": "Session is not in a valid state for continuation"}
+
+@app.post("/cancel")
+def cancel_processing(session_id):
+    if session_id not in SESSIONS:
+        return {"error": "Session not found"}
+    
+    if SESSIONS[session_id]["status"] == SessionStatus.DONE:
+        return {"error": "Session is already done"}
+
+    elif SESSIONS[session_id]["status"] == SessionStatus.FAILED:
+        return {"error": "Session has failed"}
+
+    elif SESSIONS[session_id]["status"] == SessionStatus.PROCESSING:
+        return {"error": "Session is already processing"}
+
+    elif SESSIONS[session_id]["status"] == SessionStatus.CANCELLED:
+        return {"error": "Session is already cancelled"}
+
+    elif SESSIONS[session_id]["status"] == SessionStatus.PENDING:
+        SESSIONS[session_id]["status"] = SessionStatus.CANCELLED
+        return session2response(session_id)
+
+    else:
+        return {"error": "Session is not in a valid state for cancellation"}
 
 @app.get("/results/{session_id}")
 def read_results(session_id: str):
-    default_session = {
-        "status": "unknown session",
-        "frames": [],
-        "source": None
-    }
-    
-    return SESSIONS.get(session_id, default_session)
+    return session2response(session_id)

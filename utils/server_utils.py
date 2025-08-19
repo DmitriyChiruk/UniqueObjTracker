@@ -2,13 +2,13 @@ import cv2
 
 from .detector_utils import process_boxes
 
-def process_video(cap, model, re_id, tracker, skip_classes, max_frames=-1, resize_shape=None):
+def process_video(cap, model, re_id, tracker, skip_classes, start_frame_idx=0, max_frames=-1, resize_shape=None):
     """Process cv2 video frames for object detection and tracking."""
     
     results_all = []
-    frame_idxs = 0
+    frame_idxs = start_frame_idx
 
-    while cap.isOpened() and (max_frames < 0 or frame_idxs < max_frames):
+    while cap.isOpened() and (max_frames < 0 or frame_idxs - start_frame_idx < max_frames):
         success, frame = cap.read()
         if not success:
             break
@@ -23,4 +23,4 @@ def process_video(cap, model, re_id, tracker, skip_classes, max_frames=-1, resiz
         results_all.append(result)
         frame_idxs += 1
 
-    return results_all
+    return results_all, frame_idxs-1

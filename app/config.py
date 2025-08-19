@@ -1,5 +1,25 @@
 import os
+import enum
 from dotenv import load_dotenv
+
+class SessionStatus(enum.Enum):
+    DONE = "done"
+    FAILED = "failed"
+    PENDING = "pending"
+    PROCESSING = "processing"
+    CANCELLED = "cancelled"
+    UNKNOWN = "unknown"
+
+DEFAULT_SESSION = {
+    "status": SessionStatus.UNKNOWN.value,
+    "frames": [],
+    "source": None,
+    "cap": None,
+    "next_frame": 0,
+    "chunk_sz": 200,
+    "max_frames": 1000,
+    "resize_shape": None
+}
 
 load_dotenv()
 
