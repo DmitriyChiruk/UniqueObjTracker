@@ -22,7 +22,10 @@ SESSIONS = {}
 
 def session2response(session_id):
     if session_id not in SESSIONS:
-        session = config.DEFAULT_SESSION.copy()
+        return JSONResponse(
+            {"error": f"Session '{session_id}' not found."},
+            status_code=404
+        )
     
     session = SESSIONS[session_id]
     
