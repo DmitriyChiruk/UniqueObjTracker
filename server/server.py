@@ -156,7 +156,7 @@ async def process(
     return process_chunk(session_id)
 
 @app.post("/continue")
-def continue_processing(session_id):
+def continue_processing(session_id: str = Form(...)):
     if session_id not in SESSIONS:
         return {"error": "Session not found"}
     
