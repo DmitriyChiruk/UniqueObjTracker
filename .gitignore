@@ -176,3 +176,7 @@ weights/
 
 # Vector database
 .vdb/
+
+# Temporal folders
+tmp/
+temp/

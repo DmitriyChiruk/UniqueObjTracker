@@ -14,8 +14,9 @@ def process_boxes(frame, frame_idx, result, names, re_id, skip_classes=set()):
     """
     if result.boxes is None or result.boxes.xyxy is None:
         return {"frame_index": frame_idx, "detections": []}
-    
-    boxes = result.boxes.xyxy.detach().cpu().numpy()
+
+    height, width = frame.shape[:2]
+    boxes = result.boxes.xyxyn.detach().cpu().numpy()
     classes = result.boxes.cls.detach().cpu().numpy()
     confs = result.boxes.conf.detach().cpu().numpy()
         
@@ -25,9 +26,9 @@ def process_boxes(frame, frame_idx, result, names, re_id, skip_classes=set()):
     for (tlx, tly, brx, bry), cls, conf in zip(boxes, classes, confs):
         if skip_classes and cls in skip_classes:
             continue
-        
-        tlx, tly, brx, bry = map(int, (tlx, tly, brx, bry))
-        
+
+        tlx, tly, brx, bry = map(int, (tlx * width, tly * height, brx * width, bry * height))
+
         id = None
         label = names[int(cls)]
         
