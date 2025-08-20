@@ -11,7 +11,7 @@ class SessionStatus(enum.Enum):
     UNKNOWN = "unknown"
 
 DEFAULT_SESSION = {
-    "status": SessionStatus.UNKNOWN.value,
+    "status": SessionStatus.UNKNOWN,
     "frames": [],
     "source": None,
     "cap": None,
@@ -40,3 +40,9 @@ REID_INPUT_SHAPE = tuple(input_shape)
 
 REID_SIM_THRESHOLD = float(os.getenv("REID_SIM_THRESHOLD", "0.7"))
 REID_DISTANCE = os.getenv("REID_DISTANCE", "cosine")
+
+RESULT_FOLDER = "tmp/results"
+VIDEO_FOLDER = "tmp/video"
+SESSION_FOLDER = "tmp/sessions"
+
+SERVER_URL = "http://127.0.0.1:8000"

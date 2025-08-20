@@ -1,6 +1,30 @@
 import cv2
+import os
+
+import app.config as config
 
 from .detector_utils import process_boxes
+from app.config import SessionStatus
+
+def clear_session(session_id, sessions, b_remove_session=False):
+    if session_id not in sessions:
+        return
+
+    session = sessions[session_id]
+    
+    if session["status"] == SessionStatus.PENDING:
+        return
+    
+    if session["cap"] and session["cap"].isOpened():
+        session["cap"].release()
+
+    if os.path.exists(session["source"]) and config.VIDEO_FOLDER in session["source"]:
+        os.remove(session["source"])
+
+    session_path = os.path.join(config.SESSION_FOLDER, f"{session_id}.json")
+    if b_remove_session and os.path.exists(session_path):
+        os.remove(session_path)
+        del sessions[session_id]
 
 def process_video(cap, model, re_id, tracker, skip_classes, start_frame_idx=0, max_frames=-1, resize_shape=None):
     """Process cv2 video frames for object detection and tracking."""

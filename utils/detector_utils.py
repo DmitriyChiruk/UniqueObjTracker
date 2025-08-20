@@ -129,7 +129,7 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
                 "bbox": [tlxn, tlyn, brxn, bryn],
             }
             continue
-        
+            
         saved_embed = ids_pool[rid]["embedding"]
         
         dist_cur = re_id.calc_distance(cur_embed, vdb_embed)
