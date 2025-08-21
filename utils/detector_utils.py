@@ -2,6 +2,7 @@ import os
 import cv2
 import yt_dlp
 
+import numpy as np
 from ultralytics import YOLO, RTDETR
 
 def load_model(model_path):
@@ -45,12 +46,14 @@ def draw_boxes(frame, detections, color=(0, 255, 0), thickness=2):
         
         tlx, tly, brx, bry = detection["bbox"]
         tlx, tly, brx, bry = map(int, (tlx * width, tly * height, brx * width, bry * height))
-        text = f"id: {detection['id'][:8]} {detection['label']} {detection['conf']:.2f}"
+        id_val = detection['id']
+        id_str = id_val[:8] if isinstance(id_val, str) else (str(id_val)[:8] if id_val is not None else "N/A")
+        text = f"id: {id_str} {detection['label']} {detection['conf']:.2f}"
 
         cv2.rectangle(frame, (tlx, tly), (brx, bry), color, thickness)
         cv2.putText(frame, text, (tlx, max(20, tly-5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
 
-def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), color=(0, 255, 0), thickness=2):
+def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=list(), color=(0, 255, 0), thickness=2):
     """
     Process the detected boxes.
 
@@ -63,7 +66,7 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     :param color: The color to use for drawing bounding boxes. Defaults to green.
     """
 
-    if result.boxes is None or result.boxes.xyxy is None:
+    if result.boxes is None or result.boxes.xyxyn is None:
         return {"frame_index": frame_idx, "detections": []}
     
     height, width = frame.shape[:2]
@@ -72,10 +75,11 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     confs = result.boxes.conf.detach().cpu().numpy()
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
     
-    mask = [cls not in skip_classes for cls in classes]
+    mask = ~np.isin(classes, skip_classes)
     boxes, classes, confs, ids = boxes[mask], classes[mask], confs[mask], ids[mask]
     
-    boxes_px = (boxes * [width, height, width, height]).astype(int)
+    BOX_SCALE = np.array([width, height, width, height])
+    boxes_px = (boxes * BOX_SCALE).astype(int)
     crops = [frame[y1:y2, x1:x2] for (x1, y1, x2, y2) in boxes_px]
 
     detections = []
@@ -86,12 +90,18 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     else:
         embeds = [None] * len(crops)
     
-    print(f"Created {len(embeds)} embeddings for {len(crops)} crops.")
-    
     for (tlxn, tlyn, brxn, bryn), cls, conf, id, cur_embed in zip(boxes, classes, confs, ids, embeds):
         label = labels[int(cls)]
         
         if cur_embed is None:
+            detections.append({
+                "label": label,
+                "cls": int(cls),
+                "conf": float(conf),
+                "bbox": [tlxn, tlyn, brxn, bryn],
+                "id": id,
+                "embedding": None,
+            })
             continue
         
         rid = re_id.search(cur_embed)
@@ -118,7 +128,7 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
                 "bbox": [tlxn, tlyn, brxn, bryn],
             }
             continue
-        
+            
         saved_embed = ids_pool[rid]["embedding"]
         
         dist_cur = re_id.calc_distance(cur_embed, vdb_embed)
@@ -142,9 +152,13 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
             "bbox": [tlxn, tlyn, brxn, bryn],
         }
 
-    detections = [
-        {"id": rid, "label": d["label"], "cls": d["cls"], "conf": d["conf"], "bbox": d["bbox"]}
-        for rid, d in ids_pool.items()
+    detections = [{
+        "id": rid, 
+        "label": d["label"], 
+        "cls": int(d["cls"]), 
+        "conf": float(d["conf"]), 
+        "bbox": list(map(float, d["bbox"]))
+        } for rid, d in ids_pool.items()
     ]
     return {"frame_index": frame_idx, "detections": detections}
 

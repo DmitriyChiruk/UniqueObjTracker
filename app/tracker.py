@@ -9,7 +9,6 @@ def main():
     print("Starting program...")
     model = load_model(config.MODEL_PATH)
     re_id = ReID()
-    # re_id = None
     
     cap = connect_to_video(config.STREAM_URL)
     print("Video capture started.")
