@@ -28,9 +28,7 @@ def continue_session(session_id):
 
 def cancel_session(session_id):
     response = requests.post(f"{config.SERVER_URL}/cancel/{session_id}")
-
-    print("Response: ", response)
-    # return response.json()
+    return response.json()
 
 def build_output_video(input_path, results, output_path):
     if not os.path.exists(input_path):
@@ -64,8 +62,6 @@ def build_output_video(input_path, results, output_path):
 
         out.write(frame)
         frame_idx += 1
-    
-    print("Frame_idx: ", frame_idx)
 
     cap.release()
     out.release()

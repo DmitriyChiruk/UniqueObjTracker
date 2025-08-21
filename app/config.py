@@ -29,7 +29,7 @@ TRACKER = os.getenv("TRACKER", "bytetrack.yaml")
 
 coco_num_classes = int(os.getenv("COCO_NUM_CLASSES", 80))
 classes_threshold = int(os.getenv("CLASSES_THRESHOLD", 0))
-SKIP_CLASSES = set(range(classes_threshold, coco_num_classes))
+SKIP_CLASSES = list(range(classes_threshold, coco_num_classes))
 
 CHROMADB_PATH = os.getenv("CHROMADB_PATH", "objects_ids")
 REID_MODEL = os.getenv("REID_MODEL", "osnet_x1_0")

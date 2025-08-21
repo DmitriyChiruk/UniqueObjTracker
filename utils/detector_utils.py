@@ -53,7 +53,7 @@ def draw_boxes(frame, detections, color=(0, 255, 0), thickness=2):
         cv2.rectangle(frame, (tlx, tly), (brx, bry), color, thickness)
         cv2.putText(frame, text, (tlx, max(20, tly-5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
 
-def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), color=(0, 255, 0), thickness=2):
+def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=list(), color=(0, 255, 0), thickness=2):
     """
     Process the detected boxes.
 
@@ -66,7 +66,7 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     :param color: The color to use for drawing bounding boxes. Defaults to green.
     """
 
-    if result.boxes is None or result.boxes.xyxy is None:
+    if result.boxes is None or result.boxes.xyxyn is None:
         return {"frame_index": frame_idx, "detections": []}
     
     height, width = frame.shape[:2]
@@ -75,7 +75,7 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
     confs = result.boxes.conf.detach().cpu().numpy()
     ids = result.boxes.id.detach().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes)
     
-    mask = ~np.isin(classes, list(skip_classes))
+    mask = ~np.isin(classes, skip_classes)
     boxes, classes, confs, ids = boxes[mask], classes[mask], confs[mask], ids[mask]
     
     BOX_SCALE = np.array([width, height, width, height])
@@ -94,7 +94,6 @@ def process_boxes(frame, frame_idx, result, labels, re_id, skip_classes=set(), c
         label = labels[int(cls)]
         
         if cur_embed is None:
-            # ReID not available, still process detection
             detections.append({
                 "label": label,
                 "cls": int(cls),
